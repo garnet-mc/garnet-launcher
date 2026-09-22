@@ -60,8 +60,10 @@ void main() {
         float shade = mix(1.0, sun, Strength.y * daylight * (1.0 - rain * 0.8));
         vec3 shadowTint = mix(vec3(0.62, 0.68, 0.80), vec3(1.0), shade);
         colour *= shadowTint;
-        // Lit surfaces facing the sun get a touch warmer and brighter.
-        colour *= mix(vec3(1.0), sunCol * 1.08, (1.0 - shade * 0.0) * daylight * 0.35 * shade);
+        // Lit surfaces get a touch of the sun's colour; kept subtle so the
+        // vanilla palette stays recognisable.
+        vec3 warm = mix(vec3(1.0), normalize(sunCol) * 1.7, 0.10);
+        colour *= mix(vec3(1.0), warm, daylight * shade);
         colour *= mix(1.0, ao, 0.9);
 
         // Aerial perspective: distance haze in the sky's colour, glowing near the sun.

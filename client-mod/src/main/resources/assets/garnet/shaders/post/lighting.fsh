@@ -101,9 +101,10 @@ void main() {
     float ao = ambientOcclusion(texCoord, p, n, noise);
     float sun = sunVisibility(texCoord, p, n, noise);
 
-    // Fade both out in the distance where depth precision gets poor.
+    // Fade both out in the distance where depth precision gets poor, and
+    // right in front of the camera where the held item is drawn.
     float dist = length(p);
-    float fade = smoothstep(120.0, 60.0, dist);
+    float fade = smoothstep(120.0, 60.0, dist) * smoothstep(0.35, 0.9, dist);
     ao = mix(1.0, ao, fade);
     sun = mix(1.0, sun, fade);
 

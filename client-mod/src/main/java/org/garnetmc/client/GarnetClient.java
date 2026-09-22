@@ -11,10 +11,13 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.toasts.SystemToast;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
+import org.garnetmc.client.gui.GarnetButtons;
 import org.garnetmc.client.render.GarnetRender;
 import org.garnetmc.client.voice.VoiceClient;
 import org.slf4j.Logger;
@@ -90,6 +93,7 @@ public final class GarnetClient implements ClientModInitializer {
         });
 
         GarnetRender.init();
+        GarnetButtons.register();
         Keybinds.register();
         VoiceHud.register();
         LOG.info("Garnet client ready");
@@ -134,6 +138,10 @@ public final class GarnetClient implements ClientModInitializer {
             voice = new VoiceClient(host, port, secret, mc.player.getUUID());
             voice.start();
             LOG.info("voice chat connected to {}:{}", host, port);
+            String name = mc.getCurrentServer().name;
+            SystemToast.add(mc.gui.toastManager(), new SystemToast.SystemToastId(),
+                    Component.literal("Garnet server").withStyle(style -> style.withColor(0xE04060)),
+                    Component.literal(name + " · voice chat ready · K for Garnet Render"));
         } catch (Exception e) {
             LOG.error("could not start voice chat", e);
         }
