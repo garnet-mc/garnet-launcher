@@ -49,30 +49,6 @@ float lightShafts(vec2 sunUv, float noise) {
     return light / float(SHAFT_SAMPLES);
 }
 
-// The sea surface: four wave trains crossing at different angles, longest
-// and slowest first. Returns the slope in xy and the height in z, so the
-// same field decides which way the surface faces and where its crests are.
-vec3 waveField(vec2 xz, float time, float detail) {
-    const vec4 lengths = vec4(0.055, 0.12, 0.26, 0.6);   // 1 / wavelength
-    const vec4 speeds = vec4(0.40, 0.70, 1.15, 1.75);
-    const vec4 weights = vec4(1.0, 0.5, 0.28, 0.16);
-    const vec4 angles = vec4(0.35, 1.25, 2.45, 3.95);
-    vec2 slope = vec2(0.0);
-    float height = 0.0;
-    for (int i = 0; i < 4; i++) {
-        vec2 dir = vec2(cos(angles[i]), sin(angles[i]));
-        float weight = weights[i] * (i == 3 ? detail : 1.0);
-        float phase = dot(xz, dir) * lengths[i] * 6.2831853 + time * speeds[i];
-        height += sin(phase) * weight;
-        slope += dir * cos(phase) * weight * lengths[i] * 6.2831853;
-    }
-    return vec3(slope, height);
-}
-
-vec3 waveNormal(vec2 slope) {
-    return normalize(vec3(-slope.x * 0.6, 1.0, -slope.y * 0.6));
-}
-
 // Sunlight focused by the ripples into a moving net of bright lines on the
 // bottom. Three drifting wave fronts, sharpened; cheap, and close enough to
 // the real thing at a glance.
@@ -150,8 +126,8 @@ vec3 shadeWater(vec3 colour, vec3 p, vec3 worldRel, float sun, float noise, vec3
     float dist = length(p);
     float detail = smoothstep(110.0, 18.0, dist);
 
-    vec3 wave = waveField(worldRel.xz, CameraPos.w, detail);
-    vec3 nWorld = waveNormal(wave.xy);
+    // Still water: the surface lies flat, the way vanilla draws it.
+    vec3 nWorld = vec3(0.0, 1.0, 0.0);
     vec3 nView = normalize((ViewMat * vec4(nWorld, 0.0)).xyz);
     vec3 viewDir = normalize(p);
     float cosTheta = clamp(dot(-viewDir, nView), 0.0, 1.0);
@@ -160,16 +136,12 @@ vec3 shadeWater(vec3 colour, vec3 p, vec3 worldRel, float sun, float noise, vec3
     float depthW = mapWaterDepth(TerrainMapSampler, worldRel.xz);
     float path = depthW / max(cosTheta, 0.25);
 
-    // The surface bends what is behind it. Only take the bent sample if it
-    // is water as well, or the shore smears out over the sand.
-    float bend = 0.035 * clamp(depthW, 0.0, 6.0) / max(dist * 0.25, 1.0);
-    vec2 bentUv = clamp(texCoord + nWorld.xz * bend, vec2(0.001), vec2(0.999));
-    vec3 bottom = texture(LightSampler, bentUv).b > 0.5 ? texture(SceneSampler, bentUv).rgb : colour;
-
-    // Ripples focus the sun into a net of light on the bottom, strongest in
-    // shallow water and gone once the light has been absorbed.
+    // Light bending through the surface gathers into a faint net on the
+    // bottom, strongest in the shallows and gone once the water has
+    // absorbed it.
+    vec3 bottom = colour;
     float net = caustics(worldRel.xz + SunDirWorld.xz * depthW * 0.5, CameraPos.w * 0.8);
-    bottom *= 1.0 + net * sun * daylight * (1.0 - rain) * exp(-path * 0.25) * 0.9;
+    bottom *= 1.0 + net * sun * daylight * (1.0 - rain) * exp(-path * 0.25) * 0.55;
 
     // Red goes first, then green; what is left of the bottom is blue-green.
     vec3 transmit = exp(-vec3(0.34, 0.07, 0.045) * path);
@@ -197,12 +169,9 @@ vec3 shadeWater(vec3 colour, vec3 p, vec3 worldRel, float sun, float noise, vec3
     vec3 glint = sunGlint(nView, viewDir, sunCol, dist) * sun * daylight * (1.0 - rain);
     vec3 lit = mix(body, reflection, fresnel) + glint;
 
-    // Foam where the water runs thin over the sand, on the crests that are
-    // running up it.
-    float edge = smoothstep(2.0, 0.3, depthW);
-    float crest = smoothstep(0.15, 0.85, wave.z);
-    float foam = edge * crest * mix(0.4, 1.0, detail);
-    lit = mix(lit, mix(vec3(0.86, 0.91, 0.93), sunCol, 0.15), foam * 0.3);
+    // A thin pale edge where the water runs out over the sand.
+    float foam = smoothstep(1.4, 0.35, depthW) * mix(0.4, 1.0, detail);
+    lit = mix(lit, mix(vec3(0.86, 0.91, 0.93), sunCol, 0.15), foam * 0.18);
 
     // Thin water at the shore keeps the sand showing through.
     float shore = clamp(depthW / 0.9, 0.0, 1.0);
