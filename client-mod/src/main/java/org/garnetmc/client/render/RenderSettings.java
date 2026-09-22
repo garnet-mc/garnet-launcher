@@ -17,7 +17,8 @@ public final class RenderSettings {
     public float shadows = 1.0f;
     public float bloom = 1.0f;
     public float exposure = 1.0f;
-    public float lightShafts = 1.0f;
+    /** Off by default: screen-space shafts streak wherever the horizon cuts them. */
+    public float lightShafts = 0.0f;
     public float water = 1.0f;
     public float cloudShadows = 1.0f;
     public float wind = 1.0f;
@@ -42,7 +43,7 @@ public final class RenderSettings {
         s.shadows = number(p, "shadows", 1.0f);
         s.bloom = number(p, "bloom", 1.0f);
         s.exposure = number(p, "exposure", 1.0f);
-        s.lightShafts = number(p, "light_shafts", 1.0f);
+        s.lightShafts = number(p, "light_shafts", 0.0f);
         s.water = number(p, "water", 1.0f);
         s.cloudShadows = number(p, "cloud_shadows", 1.0f);
         s.wind = number(p, "wind", 1.0f);
