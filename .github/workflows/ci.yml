@@ -26,6 +26,33 @@ jobs:
       - run: cargo build --workspace
       - run: cargo test --workspace
 
+  client-mod:
+    name: Client mod
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 25
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew build --no-daemon
+        working-directory: client-mod
+      - name: Name the jar by Minecraft version
+        run: |
+          mc=$(grep '^minecraft_version=' client-mod/gradle.properties | cut -d= -f2)
+          cp client-mod/build/libs/garnet-client-*+mc${mc}.jar garnet-client-${mc}.jar
+      - uses: actions/upload-artifact@v4
+        with:
+          name: garnet-client
+          path: garnet-client-*.jar
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          files: garnet-client-*.jar
+
   release:
     name: Package (${{ matrix.os }})
     needs: build
