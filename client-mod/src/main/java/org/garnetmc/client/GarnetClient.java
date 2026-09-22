@@ -90,6 +90,7 @@ public final class GarnetClient implements ClientModInitializer {
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (voice != null) voice.tick();
+            GarnetRender.tick(client);
         });
 
         GarnetRender.init();

@@ -52,7 +52,7 @@ void main() {
 
     // A little more saturation, then vignette.
     float luma = dot(colour, vec3(0.2126, 0.7152, 0.0722));
-    colour = mix(vec3(luma), colour, 1.12);
+    colour = mix(vec3(luma), colour, 1.05);
     vec2 centred = texCoord - 0.5;
     colour *= 1.0 - dot(centred, centred) * 0.45;
 

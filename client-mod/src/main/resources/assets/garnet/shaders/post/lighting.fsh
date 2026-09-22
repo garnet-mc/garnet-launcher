@@ -1,24 +1,28 @@
 #version 330
 #extension GL_ARB_separate_shader_objects : require
 
-// Pass 1: from the depth buffer alone, work out how much light each pixel
-// gets. Red = ambient occlusion (1 = open), green = sun visibility
-// (1 = lit). Both are noisy here and smoothed by the blur passes.
+// Pass 1: from the depth buffer and the terrain map, work out how much light
+// each pixel gets. Red = ambient occlusion (1 = open), green = sun
+// visibility (1 = lit), blue = 1 on a water surface. Red and green are noisy
+// here and smoothed by the blur passes.
 
 #include <garnet:frame.glsl>
 
 uniform sampler2D DepthSampler;
+uniform sampler2D TerrainMapSampler;
 
 layout(std140) uniform SamplerInfo {
     vec2 OutSize;
     vec2 DepthSize;
+    vec2 TerrainMapSize;
 };
 
 layout(location = 0) in vec2 texCoord;
 layout(location = 0) out vec4 fragColor;
 
-const int AO_SAMPLES = 12;
-const int SHADOW_STEPS = 16;
+const int AO_SAMPLES = 8;
+const int SHADOW_STEPS = 12;
+const int TERRAIN_STEPS = 22;
 
 // Surface normal from neighbouring depths, picking the smaller difference on
 // each axis so edges don't smear.
@@ -57,13 +61,15 @@ float ambientOcclusion(vec2 uv, vec3 p, vec3 n, float noise) {
     return 1.0 - (occlusion / float(AO_SAMPLES)) * Strength.x;
 }
 
-// March from the surface towards the sun through the depth buffer. Anything
-// the ray passes behind casts a shadow on this pixel.
+// Contact shadows: march from the surface towards the sun through the depth
+// buffer. Anything the ray passes behind casts a shadow on this pixel.
 float sunVisibility(vec2 uv, vec3 p, vec3 n, float noise) {
     if (SunDirView.w <= 0.001 || Strength.y <= 0.0) return 1.0;
     vec3 sun = normalize(SunDirView.xyz);
     float ndotl = dot(n, sun);
-    if (ndotl <= 0.0) return 0.0; // facing away: in shadow anyway
+    // Faces turned away from the sun are in shadow, but vanilla already
+    // shades block sides, so don't black them out completely.
+    if (ndotl <= 0.0) return 0.45;
     float maxDistance = 8.0;
     vec3 start = p + n * 0.08 + sun * 0.05;
     float visibility = 1.0;
@@ -83,9 +89,40 @@ float sunVisibility(vec2 uv, vec3 p, vec3 n, float noise) {
             visibility = min(visibility, 0.15 + 0.85 * smoothstep(maxDistance * 0.6, maxDistance, t));
         }
     }
-    // Grazing light gets weaker; keeps flat ground from going pitch black.
-    float lambert = mix(0.55, 1.0, clamp(ndotl, 0.0, 1.0));
-    return visibility * lambert + (1.0 - lambert) * 0.5;
+    // Grazing light is a little weaker; kept gentle because vanilla's own
+    // face shading is still underneath.
+    float lambert = mix(0.8, 1.0, clamp(ndotl, 0.0, 1.0));
+    return mix(0.45, 1.0, visibility * lambert);
+}
+
+// Long shadows: march from the surface towards the sun over the terrain map.
+// Passing close over a ridge darkens a little (a cheap penumbra); going
+// under it is full shadow.
+float terrainShadow(vec3 worldRel, vec3 nWorld, float noise) {
+    if (MapParams.z < 0.5 || SunDirWorld.w <= 0.0 || Strength.y <= 0.0) return 1.0;
+    vec3 sun = normalize(SunDirWorld.xyz);
+    vec3 pos = worldRel + nWorld * 0.05;
+    float result = 1.0;
+    float t = 0.9;
+    for (int i = 0; i < TERRAIN_STEPS; i++) {
+        vec3 q = pos + sun * t;
+        if (!insideMap(q.xz) || q.y > 330.0) break;
+        float gap = q.y - mapSurface(TerrainMapSampler, q.xz);
+        if (gap < -0.05) return 0.0;
+        // A narrow penumbra: only rays that just skim a ridge get darker.
+        result = min(result, 12.0 * gap / t);
+        t = t * 1.16 + 0.4;
+    }
+    return clamp(result, 0.0, 1.0);
+}
+
+// 1 when this pixel sits on the top of a body of water.
+float waterSurface(vec3 worldRel, vec3 nWorld, float dist) {
+    if (MapParams.z < 0.5 || !insideMap(worldRel.xz)) return 0.0;
+    if (mapWaterDepth(TerrainMapSampler, worldRel.xz) <= 0.0) return 0.0;
+    float top = mapSurface(TerrainMapSampler, worldRel.xz) - 0.11; // water sits 8/9 up its block
+    float tolerance = 0.2 + dist * 0.012;
+    return (abs(worldRel.y - top) < tolerance && nWorld.y > 0.6) ? 1.0 : 0.0;
 }
 
 void main() {
@@ -97,16 +134,23 @@ void main() {
     vec3 p = viewPosition(texCoord, depth);
     vec3 n = normalFromDepth(texCoord, p);
     float noise = interleavedNoise(gl_FragCoord.xy);
+    vec3 worldRel = worldRelative(p);
+    vec3 nWorld = normalize((ViewInv * vec4(n, 0.0)).xyz);
+    float dist = length(p);
 
     float ao = ambientOcclusion(texCoord, p, n, noise);
     float sun = sunVisibility(texCoord, p, n, noise);
+    float terrain = terrainShadow(worldRel, nWorld, noise);
+    float water = waterSurface(worldRel, nWorld, dist);
 
-    // Fade both out in the distance where depth precision gets poor, and
-    // right in front of the camera where the held item is drawn.
-    float dist = length(p);
-    float fade = smoothstep(120.0, 60.0, dist) * smoothstep(0.35, 0.9, dist);
+    // Fade the screen-space work out in the distance where depth precision
+    // gets poor, and right in front of the camera where the held item is
+    // drawn. The terrain shadow is stable at any distance.
+    float near = smoothstep(0.35, 0.9, dist);
+    float fade = smoothstep(120.0, 60.0, dist) * near;
     ao = mix(1.0, ao, fade);
     sun = mix(1.0, sun, fade);
+    sun = min(sun, mix(1.0, terrain, near));
 
-    fragColor = vec4(ao, sun, 0.0, 1.0);
+    fragColor = vec4(ao, sun, water, 1.0);
 }

@@ -28,6 +28,7 @@ loom {
             if (project.hasProperty('server')) {
                 programArgs '--quickPlayMultiplayer', project.property('server')
             }
+            vmArg '-Dgarnet.debug=true'
         }
     }
 }

@@ -46,8 +46,9 @@ public final class GarnetScreen extends Screen {
         addRenderableWidget(slider(x, y + 22, w, "Shadows", () -> s.shadows, v -> s.shadows = (float) v));
         addRenderableWidget(slider(x, y + 44, w, "Light shafts", () -> s.lightShafts, v -> s.lightShafts = (float) v));
         addRenderableWidget(slider(x, y + 66, w, "Bloom", () -> s.bloom, v -> s.bloom = (float) v));
-        addRenderableWidget(slider(x, y + 88, w, "Exposure", () -> s.exposure, v -> s.exposure = (float) v));
-        y += 114;
+        addRenderableWidget(slider(x, y + 88, w, "Water", () -> s.water, v -> s.water = (float) v));
+        addRenderableWidget(slider(x, y + 110, w, "Exposure", () -> s.exposure, v -> s.exposure = (float) v));
+        y += 136;
 
         voiceToggle = addRenderableWidget(Button.builder(voiceLabel(), b -> {
             VoiceClient voice = GarnetClient.voice();

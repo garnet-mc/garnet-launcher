@@ -22,7 +22,7 @@ layout(std140) uniform BlurConfig {
 layout(location = 0) in vec2 texCoord;
 layout(location = 0) out vec4 fragColor;
 
-const int RADIUS = 6;
+const int RADIUS = 4;
 
 void main() {
     float centreDepth = texture(DepthSampler, texCoord).r;

@@ -1,95 +1,261 @@
 {
   "targets": {
-    "light": {},
-    "light_blur": {},
+    "light": {
+      "width": 1280,
+      "height": 720
+    },
+    "light_blur": {
+      "width": 1280,
+      "height": 720
+    },
     "scene": {},
-    "bloom": {},
-    "bloom_blur": {}
+    "bloom": {
+      "width": 640,
+      "height": 360
+    },
+    "bloom_blur": {
+      "width": 640,
+      "height": 360
+    }
   },
   "passes": [
     {
       "vertex_shader": "minecraft:core/screenquad",
       "fragment_shader": "garnet:post/lighting",
       "inputs": [
-        { "sampler_name": "Depth", "target": "minecraft:main", "use_depth_buffer": true }
+        {
+          "sampler_name": "Depth",
+          "target": "minecraft:main",
+          "use_depth_buffer": true
+        },
+        {
+          "sampler_name": "TerrainMap",
+          "location": "garnet:terrain_map",
+          "width": 512,
+          "height": 512,
+          "bilinear": false
+        }
       ],
       "output": "light",
-      "uniforms": { "GarnetFrame": [ { "name": "Placeholder", "type": "float", "value": 0.0 } ] }
-    },
-    {
-      "vertex_shader": "minecraft:core/screenquad",
-      "fragment_shader": "garnet:post/light_blur",
-      "inputs": [
-        { "sampler_name": "Light", "target": "light" },
-        { "sampler_name": "Depth", "target": "minecraft:main", "use_depth_buffer": true }
-      ],
-      "output": "light_blur",
       "uniforms": {
-        "GarnetFrame": [ { "name": "Placeholder", "type": "float", "value": 0.0 } ],
-        "BlurConfig": [ { "name": "Direction", "type": "vec2", "value": [ 1.0, 0.0 ] } ]
+        "GarnetFrame": [
+          {
+            "name": "Placeholder",
+            "type": "float",
+            "value": 0.0
+          }
+        ]
       }
     },
     {
       "vertex_shader": "minecraft:core/screenquad",
       "fragment_shader": "garnet:post/light_blur",
       "inputs": [
-        { "sampler_name": "Light", "target": "light_blur" },
-        { "sampler_name": "Depth", "target": "minecraft:main", "use_depth_buffer": true }
+        {
+          "sampler_name": "Light",
+          "target": "light",
+          "bilinear": true
+        },
+        {
+          "sampler_name": "Depth",
+          "target": "minecraft:main",
+          "use_depth_buffer": true
+        }
+      ],
+      "output": "light_blur",
+      "uniforms": {
+        "GarnetFrame": [
+          {
+            "name": "Placeholder",
+            "type": "float",
+            "value": 0.0
+          }
+        ],
+        "BlurConfig": [
+          {
+            "name": "Direction",
+            "type": "vec2",
+            "value": [
+              1.0,
+              0.0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "garnet:post/light_blur",
+      "inputs": [
+        {
+          "sampler_name": "Light",
+          "target": "light_blur",
+          "bilinear": true
+        },
+        {
+          "sampler_name": "Depth",
+          "target": "minecraft:main",
+          "use_depth_buffer": true
+        }
       ],
       "output": "light",
       "uniforms": {
-        "GarnetFrame": [ { "name": "Placeholder", "type": "float", "value": 0.0 } ],
-        "BlurConfig": [ { "name": "Direction", "type": "vec2", "value": [ 0.0, 1.0 ] } ]
+        "GarnetFrame": [
+          {
+            "name": "Placeholder",
+            "type": "float",
+            "value": 0.0
+          }
+        ],
+        "BlurConfig": [
+          {
+            "name": "Direction",
+            "type": "vec2",
+            "value": [
+              0.0,
+              1.0
+            ]
+          }
+        ]
       }
     },
     {
       "vertex_shader": "minecraft:core/screenquad",
       "fragment_shader": "garnet:post/composite",
       "inputs": [
-        { "sampler_name": "Scene", "target": "minecraft:main", "bilinear": true },
-        { "sampler_name": "Depth", "target": "minecraft:main", "use_depth_buffer": true },
-        { "sampler_name": "Light", "target": "light", "bilinear": true }
+        {
+          "sampler_name": "Scene",
+          "target": "minecraft:main",
+          "bilinear": true
+        },
+        {
+          "sampler_name": "Depth",
+          "target": "minecraft:main",
+          "use_depth_buffer": true
+        },
+        {
+          "sampler_name": "Light",
+          "target": "light",
+          "bilinear": true
+        },
+        {
+          "sampler_name": "TerrainMap",
+          "location": "garnet:terrain_map",
+          "width": 512,
+          "height": 512,
+          "bilinear": false
+        }
       ],
       "output": "scene",
-      "uniforms": { "GarnetFrame": [ { "name": "Placeholder", "type": "float", "value": 0.0 } ] }
+      "uniforms": {
+        "GarnetFrame": [
+          {
+            "name": "Placeholder",
+            "type": "float",
+            "value": 0.0
+          }
+        ]
+      }
     },
     {
       "vertex_shader": "minecraft:core/screenquad",
       "fragment_shader": "garnet:post/bright",
       "inputs": [
-        { "sampler_name": "Scene", "target": "scene", "bilinear": true }
+        {
+          "sampler_name": "Scene",
+          "target": "scene",
+          "bilinear": true
+        }
       ],
       "output": "bloom",
-      "uniforms": { "GarnetFrame": [ { "name": "Placeholder", "type": "float", "value": 0.0 } ] }
+      "uniforms": {
+        "GarnetFrame": [
+          {
+            "name": "Placeholder",
+            "type": "float",
+            "value": 0.0
+          }
+        ]
+      }
     },
     {
       "vertex_shader": "minecraft:core/screenquad",
       "fragment_shader": "garnet:post/bloom_blur",
       "inputs": [
-        { "sampler_name": "Bloom", "target": "bloom", "bilinear": true }
+        {
+          "sampler_name": "Bloom",
+          "target": "bloom",
+          "bilinear": true
+        }
       ],
       "output": "bloom_blur",
-      "uniforms": { "BlurConfig": [ { "name": "Direction", "type": "vec2", "value": [ 1.0, 0.0 ] } ] }
+      "uniforms": {
+        "BlurConfig": [
+          {
+            "name": "Direction",
+            "type": "vec2",
+            "value": [
+              1.0,
+              0.0
+            ]
+          }
+        ]
+      }
     },
     {
       "vertex_shader": "minecraft:core/screenquad",
       "fragment_shader": "garnet:post/bloom_blur",
       "inputs": [
-        { "sampler_name": "Bloom", "target": "bloom_blur", "bilinear": true }
+        {
+          "sampler_name": "Bloom",
+          "target": "bloom_blur",
+          "bilinear": true
+        }
       ],
       "output": "bloom",
-      "uniforms": { "BlurConfig": [ { "name": "Direction", "type": "vec2", "value": [ 0.0, 1.0 ] } ] }
+      "uniforms": {
+        "BlurConfig": [
+          {
+            "name": "Direction",
+            "type": "vec2",
+            "value": [
+              0.0,
+              1.0
+            ]
+          }
+        ]
+      }
     },
     {
       "vertex_shader": "minecraft:core/screenquad",
       "fragment_shader": "garnet:post/final",
       "inputs": [
-        { "sampler_name": "Scene", "target": "scene", "bilinear": true },
-        { "sampler_name": "Bloom", "target": "bloom", "bilinear": true },
-        { "sampler_name": "Depth", "target": "minecraft:main", "use_depth_buffer": true }
+        {
+          "sampler_name": "Scene",
+          "target": "scene",
+          "bilinear": true
+        },
+        {
+          "sampler_name": "Bloom",
+          "target": "bloom",
+          "bilinear": true
+        },
+        {
+          "sampler_name": "Depth",
+          "target": "minecraft:main",
+          "use_depth_buffer": true
+        }
       ],
       "output": "minecraft:main",
-      "uniforms": { "GarnetFrame": [ { "name": "Placeholder", "type": "float", "value": 0.0 } ] }
+      "uniforms": {
+        "GarnetFrame": [
+          {
+            "name": "Placeholder",
+            "type": "float",
+            "value": 0.0
+          }
+        ]
+      }
     }
   ]
 }

@@ -5,6 +5,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.api.commands.RenderPass;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.MappableRingBuffer;
@@ -49,7 +50,21 @@ public final class GarnetRender {
     private GarnetRender() {}
 
     public static void init() {
+        // The GPU device only exists once the window is up, so the terrain
+        // map texture is created when the client has finished starting.
+        ClientLifecycleEvents.CLIENT_STARTED.register(TerrainMap::register);
         apply();
+    }
+
+    private static final boolean DEBUG = Boolean.getBoolean("garnet.debug");
+    private static int debugTicks;
+
+    /** Client tick. */
+    public static void tick(Minecraft mc) {
+        TerrainMap.tick(mc);
+        if (DEBUG && ++debugTicks % 100 == 0 && mc.level != null) {
+            log("fps " + mc.getFps() + (enabled ? " with" : " without") + " Garnet Render");
+        }
     }
 
     public static boolean isEnabled() {
@@ -78,6 +93,7 @@ public final class GarnetRender {
         pending = null;
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) return;
+        TerrainMap.upload();
         LevelRenderState state = ((LevelRendererAccessor) mc.levelRenderer).garnet$levelRenderState();
         CameraRenderState cam = state.cameraRenderState;
         if (cam == null || cam.projectionMatrix == null || cam.viewRotationMatrix == null) return;
@@ -125,7 +141,8 @@ public final class GarnetRender {
         b.putMat4f(scratch.set(cam.viewRotationMatrix).invert());
         b.putVec4(sunView.x, sunView.y, sunView.z, daylight);
         b.putVec4(sunWorld.x, sunWorld.y, sunWorld.z, sunWorld.y);
-        b.putVec4((float) (cam.pos.x % 4096.0), (float) cam.pos.y, (float) (cam.pos.z % 4096.0), (float) (time % 3600.0));
+        // Camera relative to the terrain map's corner keeps the shader maths small.
+        b.putVec4((float) (cam.pos.x - TerrainMap.originX()), (float) cam.pos.y, (float) (cam.pos.z - TerrainMap.originZ()), (float) (time % 3600.0));
         b.putVec4(envEnd, fogEnd, rain, underwater ? 1f : 0f);
         // The sky state is only filled in for dimensions with a sky; fall back to a plain blue.
         float skyR = 0.48f, skyG = 0.65f, skyB = 1.0f;
@@ -137,6 +154,7 @@ public final class GarnetRender {
         b.putVec4(skyR, skyG, skyB, sky.sunriseAndSunsetColor != null ? sky.sunriseAndSunsetColor.w() : 0f);
         b.putVec4(settings.ambientOcclusion, settings.shadows, settings.bloom, settings.exposure);
         b.putVec4(0.05f, cam.depthFar, zeroToOne ? 1f : 0f, settings.lightShafts);
+        b.putVec4(TerrainMap.SIZE, 1f / TerrainMap.SIZE, TerrainMap.isReady() ? 1f : 0f, settings.water);
     }
 
     private static float smoothstep(float edge0, float edge1, float x) {

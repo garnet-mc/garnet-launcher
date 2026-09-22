@@ -6,10 +6,14 @@ server needs from the client that vanilla cannot do.
 - **Garnet Render** – our own shader pipeline, no Iris needed. It hooks the
   end-of-frame post effect that Minecraft 26 runs through its GPU
   abstraction, so it works on both the OpenGL and Vulkan backends and next
-  to any other mod. Passes: ambient occlusion, screen-space sun shadows,
-  atmosphere and light shafts, bloom, filmic tone mapping. `K` toggles it;
-  strengths live in `config/garnet-render.properties`. The shaders are plain
-  `#version 330` files under `assets/garnet/shaders/post/` and the chain is
+  to any other mod. Passes: ambient occlusion, sun shadows (long shadows from
+  hills, trees and buildings come from a top-down terrain map the mod keeps
+  on the GPU, plus screen-space contact shadows), water surfaces with
+  reflections, waves, depth tint and sun glint, atmosphere and light shafts,
+  bloom, filmic tone mapping. `K` toggles it; every effect has a strength in
+  the Garnet menu and in `config/garnet-render.properties`, so weaker
+  machines can turn things down. The shaders are plain `#version 330` files
+  under `assets/garnet/shaders/post/` and the chain is
   `assets/garnet/post_effect/render.json`.
 - **Server mod sync** – answers the server's `garnet:mods` handshake with the
   list of installed mods, so the server can let you in or tell the launcher
