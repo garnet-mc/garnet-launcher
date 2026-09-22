@@ -12,6 +12,7 @@ import net.minecraft.util.ARGB;
 import org.garnetmc.client.GarnetClient;
 import org.garnetmc.client.render.GarnetRender;
 import org.garnetmc.client.render.RenderSettings;
+import org.garnetmc.client.render.Wind;
 import org.garnetmc.client.voice.VoiceClient;
 
 import java.util.function.DoubleConsumer;
@@ -46,9 +47,16 @@ public final class GarnetScreen extends Screen {
         addRenderableWidget(slider(x, y + 22, w, "Shadows", () -> s.shadows, v -> s.shadows = (float) v));
         addRenderableWidget(slider(x, y + 44, w, "Light shafts", () -> s.lightShafts, v -> s.lightShafts = (float) v));
         addRenderableWidget(slider(x, y + 66, w, "Bloom", () -> s.bloom, v -> s.bloom = (float) v));
-        addRenderableWidget(slider(x, y + 88, w, "Water", () -> s.water, v -> s.water = (float) v));
-        addRenderableWidget(slider(x, y + 110, w, "Exposure", () -> s.exposure, v -> s.exposure = (float) v));
-        y += 136;
+        addRenderableWidget(slider(x, y + 88, w, "Cloud shadows", () -> s.cloudShadows, v -> s.cloudShadows = (float) v));
+        addRenderableWidget(slider(x, y + 110, w, "Water", () -> s.water, v -> s.water = (float) v));
+        addRenderableWidget(slider(x, y + 132, w, "Exposure", () -> s.exposure, v -> s.exposure = (float) v));
+        // Wind is built into the chunk meshes, so changing it rebuilds them.
+        addRenderableWidget(slider(x, y + 154, w, "Wind", () -> s.wind, v -> {
+            if (s.wind == (float) v) return;
+            s.wind = (float) v;
+            Wind.rebuildChunks();
+        }));
+        y += 180;
 
         voiceToggle = addRenderableWidget(Button.builder(voiceLabel(), b -> {
             VoiceClient voice = GarnetClient.voice();

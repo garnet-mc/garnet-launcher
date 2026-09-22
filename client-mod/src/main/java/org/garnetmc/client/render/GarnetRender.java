@@ -6,13 +6,17 @@ import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.api.commands.RenderPass;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
+import net.minecraft.client.CloudStatus;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GameRenderer;
+import com.mojang.blaze3d.platform.NativeImage;
 import net.minecraft.client.renderer.MappableRingBuffer;
+import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.client.renderer.state.level.LevelRenderState;
 import net.minecraft.client.renderer.state.level.SkyRenderState;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.material.FogType;
 import org.garnetmc.client.GarnetClient;
 import org.garnetmc.client.mixin.LevelRendererAccessor;
@@ -44,6 +48,12 @@ public final class GarnetRender {
     private static boolean enabled = settings.enabled;
     private static MappableRingBuffer frameBlock;
     private static final Matrix4f scratch = new Matrix4f();
+    private static final Identifier CLOUDS = Identifier.withDefaultNamespace("textures/environment/clouds.png");
+    /** Where our copy of the cloud sheet lives; the post effect reads it by this name. */
+    public static final Identifier CLOUD_SHEET = Identifier.fromNamespaceAndPath("garnet", "cloud_sheet");
+    private static DynamicTexture cloudSheet;
+    /** Cloud textures tile every 12 blocks a cell; a wide multiple of that. */
+    private static final float CLOUD_PERIOD = 12f * 4096f;
     private static final Vector3f sunWorld = new Vector3f();
     private static final Vector3f sunView = new Vector3f();
 
@@ -52,7 +62,12 @@ public final class GarnetRender {
     public static void init() {
         // The GPU device only exists once the window is up, so the terrain
         // map texture is created when the client has finished starting.
-        ClientLifecycleEvents.CLIENT_STARTED.register(TerrainMap::register);
+        ClientLifecycleEvents.CLIENT_STARTED.register(mc -> {
+            TerrainMap.register(mc);
+            // The sky reads the cloud sheet straight off disk, so nothing has
+            // put it on the GPU for us to sample.
+            loadClouds(mc);
+        });
         apply();
     }
 
@@ -93,7 +108,6 @@ public final class GarnetRender {
         pending = null;
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) return;
-        TerrainMap.upload();
         LevelRenderState state = ((LevelRendererAccessor) mc.levelRenderer).garnet$levelRenderState();
         CameraRenderState cam = state.cameraRenderState;
         if (cam == null || cam.projectionMatrix == null || cam.viewRotationMatrix == null) return;
@@ -116,9 +130,52 @@ public final class GarnetRender {
         }
     }
 
-    /** Binds the terrain map to passes that use it. */
-    public static void bindTerrainMap(RenderPass pass) {
-        TerrainMap.bind(pass);
+    // Which passes read which of our textures. The post chain resolves the
+    // textures named in render.json once, while it is being loaded, which is
+    // before either of these exists, so they are bound here instead. The
+    // numbers are the passes' order in render.json.
+    private static final int LIGHTING_PASS = 0;
+    private static final int COMPOSITE_PASS = 3;
+
+    /** Hands a pass of ours the textures it reads. */
+    public static void bindTextures(String location, RenderPass pass) {
+        int pass_index;
+        try {
+            pass_index = Integer.parseInt(location.substring(location.lastIndexOf('/') + 1));
+        } catch (NumberFormatException e) {
+            return;
+        }
+        if (pass_index == LIGHTING_PASS || pass_index == COMPOSITE_PASS) {
+            TerrainMap.bind(pass);
+        }
+        if (pass_index == COMPOSITE_PASS) {
+            bindClouds(pass);
+        }
+    }
+
+    /** Binds our copy of the cloud sheet. */
+    private static void bindClouds(RenderPass pass) {
+        if (cloudSheet == null) return;
+        var view = cloudSheet.getTextureView();
+        if (view == null) return;
+        pass.setUniform("CloudsSampler", view, RenderSystem.getSamplerCache()
+                .getRepeat(com.mojang.renderpearl.api.textures.FilterMode.LINEAR));
+    }
+
+    /**
+     * Reads the cloud sheet the sky is drawn from and keeps a copy on the
+     * GPU: vanilla only ever reads it on the CPU, to work out where the
+     * cloud blocks go, so there is nothing for the shaders to sample.
+     */
+    private static void loadClouds(Minecraft mc) {
+        try (java.io.InputStream in = mc.getResourceManager().open(CLOUDS)) {
+            NativeImage image = NativeImage.read(in);
+            cloudSheet = new DynamicTexture(() -> "Garnet cloud sheet", image);
+            cloudSheet.upload();
+            mc.getTextureManager().register(CLOUD_SHEET, cloudSheet);
+        } catch (Exception e) {
+            GarnetClient.LOG.warn("could not read the cloud sheet; cloud shadows are off", e);
+        }
     }
 
     private static void write(Std140Builder b, Minecraft mc, LevelRenderState state, CameraRenderState cam) {
@@ -160,6 +217,26 @@ public final class GarnetRender {
         b.putVec4(settings.ambientOcclusion, settings.shadows, settings.bloom, settings.exposure);
         b.putVec4(0.05f, cam.depthFar, zeroToOne ? 1f : 0f, settings.lightShafts);
         b.putVec4(TerrainMap.SIZE, 1f / TerrainMap.SIZE, TerrainMap.isReady() ? 1f : 0f, settings.water);
+        writeClouds(b, mc, state, partial);
+        b.putVec4(TerrainMap.wrapX(), TerrainMap.wrapZ(), 0f, 0f);
+    }
+
+    /**
+     * Where the cloud layer is right now, in the same terms the cloud
+     * renderer uses: cells 12 blocks wide that drift 0.03 blocks a tick and
+     * come back round every 400 ticks. The shift is folded together with the
+     * terrain map's corner so the shaders can work in map-relative blocks.
+     */
+    private static void writeClouds(Std140Builder b, Minecraft mc, LevelRenderState state, float partial) {
+        boolean hasClouds = state.skyRenderState.skybox == DimensionType.Skybox.OVERWORLD
+                && mc.options.getCloudStatus() != CloudStatus.OFF
+                && state.cloudHeight > 0f;
+        float strength = hasClouds ? settings.cloudShadows * 0.32f : 0f;
+        float drift = ((float) (state.gameTime % 400L) + partial) * 0.03f;
+        // Kept near the origin so the shader's maths stays precise far out.
+        float shiftX = (TerrainMap.originX() + drift) % CLOUD_PERIOD;
+        float shiftZ = (TerrainMap.originZ() + 3.96f) % CLOUD_PERIOD;
+        b.putVec4(shiftX, shiftZ, state.cloudHeight, strength);
     }
 
     private static float smoothstep(float edge0, float edge1, float x) {

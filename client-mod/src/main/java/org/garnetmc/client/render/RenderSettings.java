@@ -19,6 +19,8 @@ public final class RenderSettings {
     public float exposure = 1.0f;
     public float lightShafts = 1.0f;
     public float water = 1.0f;
+    public float cloudShadows = 1.0f;
+    public float wind = 1.0f;
 
     private static Path file() {
         return FabricLoader.getInstance().getConfigDir().resolve("garnet-render.properties");
@@ -42,6 +44,8 @@ public final class RenderSettings {
         s.exposure = number(p, "exposure", 1.0f);
         s.lightShafts = number(p, "light_shafts", 1.0f);
         s.water = number(p, "water", 1.0f);
+        s.cloudShadows = number(p, "cloud_shadows", 1.0f);
+        s.wind = number(p, "wind", 1.0f);
         return s;
     }
 
@@ -54,6 +58,8 @@ public final class RenderSettings {
         p.setProperty("exposure", Float.toString(exposure));
         p.setProperty("light_shafts", Float.toString(lightShafts));
         p.setProperty("water", Float.toString(water));
+        p.setProperty("cloud_shadows", Float.toString(cloudShadows));
+        p.setProperty("wind", Float.toString(wind));
         try (Writer writer = Files.newBufferedWriter(file())) {
             p.store(writer, "Garnet Render. Each strength is 0 (off) to about 2; 1 is the default look.");
         } catch (IOException e) {

@@ -1,13 +1,7 @@
 {
   "targets": {
-    "light": {
-      "width": 1280,
-      "height": 720
-    },
-    "light_blur": {
-      "width": 1280,
-      "height": 720
-    },
+    "light": {},
+    "light_blur": {},
     "scene": {},
     "bloom": {
       "width": 640,
@@ -144,6 +138,13 @@
           "width": 512,
           "height": 512,
           "bilinear": false
+        },
+        {
+          "sampler_name": "Clouds",
+          "location": "garnet:cloud_sheet",
+          "width": 256,
+          "height": 256,
+          "bilinear": true
         }
       ],
       "output": "scene",

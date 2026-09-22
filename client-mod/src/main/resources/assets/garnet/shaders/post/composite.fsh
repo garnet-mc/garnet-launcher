@@ -11,6 +11,7 @@ uniform sampler2D SceneSampler;
 uniform sampler2D DepthSampler;
 uniform sampler2D LightSampler;
 uniform sampler2D TerrainMapSampler;
+uniform sampler2D CloudsSampler;
 
 layout(std140) uniform SamplerInfo {
     vec2 OutSize;
@@ -18,12 +19,13 @@ layout(std140) uniform SamplerInfo {
     vec2 DepthSize;
     vec2 LightSize;
     vec2 TerrainMapSize;
+    vec2 CloudsSize;
 };
 
 layout(location = 0) in vec2 texCoord;
 layout(location = 0) out vec4 fragColor;
 
-const int SHAFT_SAMPLES = 24;
+const int SHAFT_SAMPLES = 40;
 const int REFLECTION_STEPS = 28;
 
 // How much of the sky is visible along the line from this pixel to the sun.
@@ -31,7 +33,9 @@ float lightShafts(vec2 sunUv, float noise) {
     vec2 delta = (sunUv - texCoord) / float(SHAFT_SAMPLES);
     // Don't reach too far across the screen; keeps the effect local.
     delta *= 0.85;
-    vec2 uv = texCoord + delta * noise;
+    // Start each pixel at a different point along the line, or the steps
+    // show up as stripes across a smooth sky.
+    vec2 uv = texCoord + delta * (noise * 2.0 - 0.5);
     float light = 0.0;
     float weight = 1.0;
     float decay = 0.94;
@@ -45,16 +49,72 @@ float lightShafts(vec2 sunUv, float noise) {
     return light / float(SHAFT_SAMPLES);
 }
 
-// Small rolling waves: a few sines at different scales drifting with time.
-vec3 waveNormal(vec2 xz, float time) {
-    float t = time * 0.9;
-    float sx = cos(xz.x * 1.7 + t * 1.3) * 0.85
-             + cos((xz.x + xz.y) * 4.1 + t * 2.1) * 1.4
-             + cos((xz.x - xz.y * 0.6) * 5.3 - t * 1.7) * 1.3;
-    float sz = cos(xz.y * 2.3 - t * 1.1) * 1.15
-             + cos((xz.x + xz.y) * 4.1 + t * 2.1) * 1.4
-             - cos((xz.x - xz.y * 0.6) * 5.3 - t * 1.7) * 0.8;
-    return normalize(vec3(-sx * 0.035, 1.0, -sz * 0.035));
+// The sea surface: four wave trains crossing at different angles, longest
+// and slowest first. Returns the slope in xy and the height in z, so the
+// same field decides which way the surface faces and where its crests are.
+vec3 waveField(vec2 xz, float time, float detail) {
+    const vec4 lengths = vec4(0.055, 0.12, 0.26, 0.6);   // 1 / wavelength
+    const vec4 speeds = vec4(0.40, 0.70, 1.15, 1.75);
+    const vec4 weights = vec4(1.0, 0.5, 0.28, 0.16);
+    const vec4 angles = vec4(0.35, 1.25, 2.45, 3.95);
+    vec2 slope = vec2(0.0);
+    float height = 0.0;
+    for (int i = 0; i < 4; i++) {
+        vec2 dir = vec2(cos(angles[i]), sin(angles[i]));
+        float weight = weights[i] * (i == 3 ? detail : 1.0);
+        float phase = dot(xz, dir) * lengths[i] * 6.2831853 + time * speeds[i];
+        height += sin(phase) * weight;
+        slope += dir * cos(phase) * weight * lengths[i] * 6.2831853;
+    }
+    return vec3(slope, height);
+}
+
+vec3 waveNormal(vec2 slope) {
+    return normalize(vec3(-slope.x * 0.6, 1.0, -slope.y * 0.6));
+}
+
+// Sunlight focused by the ripples into a moving net of bright lines on the
+// bottom. Three drifting wave fronts, sharpened; cheap, and close enough to
+// the real thing at a glance.
+float caustics(vec2 xz, float time) {
+    float v = 0.0;
+    for (int i = 0; i < 3; i++) {
+        float angle = float(i) * 2.0944 + 0.4;
+        vec2 dir = vec2(cos(angle), sin(angle));
+        v += sin(dot(xz, dir) * 2.3 + time * (1.1 + 0.17 * float(i)));
+    }
+    float lines = max(0.0, v / 3.0);
+    return pow(lines, 4.0);
+}
+
+// Air into water, the real thing rather than Schlick: it holds up at the
+// grazing angles you get looking across a sea.
+float waterFresnel(float cosi) {
+    const float n2 = 1.33477;
+    float sint = sqrt(max(0.0, 1.0 - cosi * cosi)) / n2;
+    if (sint >= 1.0) return 1.0;
+    float cost = sqrt(max(0.0, 1.0 - sint * sint));
+    float rs = (cosi - cost * n2) / (cosi + cost * n2);
+    float rp = (cost - cosi * n2) / (cost + cosi * n2);
+    return clamp((rs * rs + rp * rp) * 0.5, 0.02, 1.0);
+}
+
+// A GGX highlight for the sun, which spreads out with distance so far
+// crests do not flicker from one pixel to the next.
+vec3 sunGlint(vec3 n, vec3 viewDir, vec3 sunCol, float dist) {
+    vec3 l = normalize(SunDirView.xyz);
+    vec3 h = normalize(l - viewDir);
+    float ndoth = max(dot(n, h), 0.0);
+    float ndotl = max(dot(n, l), 0.0);
+    float ndotv = max(dot(n, -viewDir), 0.001);
+    float rough = clamp(0.045 + dist * 0.0009, 0.02, 1.0);
+    float a2 = rough * rough;
+    float denom = ndoth * ndoth * (a2 - 1.0) + 1.0;
+    float d = a2 / (3.14159265 * denom * denom);
+    float k = (rough + 1.0) * (rough + 1.0) / 8.0;
+    float g = (ndotl / (ndotl * (1.0 - k) + k)) * (ndotv / (ndotv * (1.0 - k) + k));
+    float f = 0.02 + pow(1.0 - max(dot(h, -viewDir), 0.0), 5.0) * 0.98;
+    return sunCol * (d * g * f * ndotl / (4.0 * ndotv));
 }
 
 // March a reflected ray through the depth buffer; the hit uv, or -1 for none.
@@ -76,19 +136,50 @@ vec2 reflectionHit(vec3 origin, vec3 dir, float noise) {
     return vec2(-1.0);
 }
 
+/**
+ * Water, shaded the way a deep-water renderer does it: the light that comes
+ * back out of the water is what vanilla drew, dimmed along its path through
+ * the water by how strongly water absorbs each colour, plus the light that
+ * scattered back before it ever reached the bottom. On top of that goes the
+ * reflection of the world, weighted by the Fresnel of the surface, and the
+ * sun's own highlight.
+ */
 vec3 shadeWater(vec3 colour, vec3 p, vec3 worldRel, float sun, float noise, vec3 sunCol) {
     float daylight = SunDirView.w;
     float rain = FogParams.z;
-    float depthW = mapWaterDepth(TerrainMapSampler, worldRel.xz);
-    vec3 nWorld = waveNormal(worldRel.xz, CameraPos.w);
+    float dist = length(p);
+    float detail = smoothstep(110.0, 18.0, dist);
+
+    vec3 wave = waveField(worldRel.xz, CameraPos.w, detail);
+    vec3 nWorld = waveNormal(wave.xy);
     vec3 nView = normalize((ViewMat * vec4(nWorld, 0.0)).xyz);
     vec3 viewDir = normalize(p);
-
-    // Fresnel: glancing views are mirrors, looking straight down sees through.
     float cosTheta = clamp(dot(-viewDir, nView), 0.0, 1.0);
-    float fresnel = 0.02 + 0.98 * pow(1.0 - cosTheta, 5.0);
 
-    // Reflection: the scene where the ray lands, otherwise the sky.
+    // How far light travelled through the water to reach the eye.
+    float depthW = mapWaterDepth(TerrainMapSampler, worldRel.xz);
+    float path = depthW / max(cosTheta, 0.25);
+
+    // The surface bends what is behind it. Only take the bent sample if it
+    // is water as well, or the shore smears out over the sand.
+    float bend = 0.035 * clamp(depthW, 0.0, 6.0) / max(dist * 0.25, 1.0);
+    vec2 bentUv = clamp(texCoord + nWorld.xz * bend, vec2(0.001), vec2(0.999));
+    vec3 bottom = texture(LightSampler, bentUv).b > 0.5 ? texture(SceneSampler, bentUv).rgb : colour;
+
+    // Ripples focus the sun into a net of light on the bottom, strongest in
+    // shallow water and gone once the light has been absorbed.
+    float net = caustics(worldRel.xz + SunDirWorld.xz * depthW * 0.5, CameraPos.w * 0.8);
+    bottom *= 1.0 + net * sun * daylight * (1.0 - rain) * exp(-path * 0.25) * 0.9;
+
+    // Red goes first, then green; what is left of the bottom is blue-green.
+    vec3 transmit = exp(-vec3(0.34, 0.07, 0.045) * path);
+    vec3 absorbed = vec3(1.0) - transmit;
+    vec3 deep = mix(vec3(0.02, 0.10, 0.15), SkyColor.rgb * 0.35, 0.35) * mix(0.15, 1.0, daylight);
+    vec3 scatter = (sunCol * 0.5 + SkyColor.rgb * 0.3) * deep * sun * daylight;
+    vec3 body = bottom * transmit + deep * absorbed + scatter * absorbed * 0.5;
+
+    // What the surface mirrors: the scene where the ray lands, the sky where
+    // it does not.
     vec3 reflectDir = reflect(viewDir, nView);
     vec3 reflectWorld = normalize((ViewInv * vec4(reflectDir, 0.0)).xyz);
     float sunAmount = pow(max(dot(reflectWorld, normalize(SunDirWorld.xyz)), 0.0), 8.0);
@@ -97,21 +188,25 @@ vec3 shadeWater(vec3 colour, vec3 p, vec3 worldRel, float sun, float noise, vec3
     vec3 reflection = sky;
     vec2 hit = reflectionHit(p + nView * 0.05, reflectDir, noise);
     if (hit.x >= 0.0) {
-        vec2 edge = smoothstep(0.0, 0.15, hit) * smoothstep(0.0, 0.15, 1.0 - hit);
-        reflection = mix(sky, texture(SceneSampler, hit).rgb, edge.x * edge.y);
+        vec2 border = smoothstep(0.0, 0.2, hit) * smoothstep(0.0, 0.2, 1.0 - hit);
+        float near = smoothstep(90.0, 25.0, dist); // far reflections only smear
+        reflection = mix(sky, texture(SceneSampler, hit).rgb, border.x * border.y * near * 0.85);
     }
 
-    // The water body: what vanilla drew, pulled towards deep blue-green with depth.
-    vec3 deep = vec3(0.02, 0.09, 0.14) * mix(0.15, 1.0, daylight);
-    float absorb = 1.0 - exp(-depthW * 0.28);
-    vec3 body = mix(colour, deep, absorb * 0.75);
+    float fresnel = waterFresnel(cosTheta);
+    vec3 glint = sunGlint(nView, viewDir, sunCol, dist) * sun * daylight * (1.0 - rain);
+    vec3 lit = mix(body, reflection, fresnel) + glint;
 
-    // Sun glint on the waves.
-    vec3 halfVec = normalize(normalize(SunDirView.xyz) - viewDir);
-    float glint = pow(max(dot(nView, halfVec), 0.0), 320.0) * daylight * sun * (1.0 - rain);
+    // Foam where the water runs thin over the sand, on the crests that are
+    // running up it.
+    float edge = smoothstep(2.0, 0.3, depthW);
+    float crest = smoothstep(0.15, 0.85, wave.z);
+    float foam = edge * crest * mix(0.4, 1.0, detail);
+    lit = mix(lit, mix(vec3(0.86, 0.91, 0.93), sunCol, 0.15), foam * 0.3);
 
-    vec3 shaded = mix(body, reflection, clamp(fresnel * 0.95 + 0.05, 0.0, 1.0)) + sunCol * glint * 1.6;
-    return mix(colour, shaded, MapParams.w);
+    // Thin water at the shore keeps the sand showing through.
+    float shore = clamp(depthW / 0.9, 0.0, 1.0);
+    return mix(colour, mix(colour, lit, shore), MapParams.w);
 }
 
 void main() {
@@ -133,10 +228,14 @@ void main() {
         bool water = light.b > 0.5 && MapParams.w > 0.0;
 
         vec3 p = viewPosition(texCoord, depth);
+        vec3 worldRel = worldRelative(p);
         if (water) {
-            colour = shadeWater(colour, p, worldRelative(p), sun, noise, sunCol);
+            colour = shadeWater(colour, p, worldRel, sun, noise, sunCol);
             ao = 1.0;
         }
+
+        // Clouds take a little of the sun away from what they pass over.
+        sun = min(sun, 1.0 - cloudShadow(CloudsSampler, worldRel) * shadowWeight());
 
         // Shadowed areas keep the sky's ambient light; lit areas get the sun.
         float shade = mix(1.0, sun, Strength.y * shadowWeight() * (1.0 - rain * 0.8));
@@ -154,10 +253,12 @@ void main() {
         float sunAmount = pow(max(dot(viewDir, normalize(SunDirView.xyz)), 0.0), 6.0);
         vec3 haze = mix(SkyColor.rgb, sunCol, sunAmount * daylight * 0.6);
         haze = mix(haze, vec3(0.55, 0.58, 0.62), rain * 0.7);
-        float density = (0.0022 + rain * 0.006) * mix(1.6, 1.0, daylight);
+        float density = (0.0010 + rain * 0.0035) * mix(1.3, 1.0, daylight);
         float fog = 1.0 - exp(-dist * density);
-        fog *= smoothstep(0.0, 1.0, dist / max(FogParams.x * 0.9, 1.0)) * 0.9 + 0.1;
-        colour = mix(colour, haze, clamp(fog, 0.0, 0.85));
+        // Against the render distance, which holds still: the environmental
+        // fog closes in while chunks load and would make the haze breathe.
+        fog *= smoothstep(0.1, 1.0, dist / max(FogParams.y, 1.0)) * 0.85 + 0.15;
+        colour = mix(colour, haze, clamp(fog, 0.0, 0.55));
     }
 
     // Light shafts: only when the sun is on screen, in front of the camera.
@@ -165,10 +266,13 @@ void main() {
         vec3 sunView = normalize(SunDirView.xyz) * 500.0;
         vec3 s = project(sunView);
         if (s.x >= -0.3 && s.x <= 1.3 && s.y >= -0.3 && s.y <= 1.3) {
-            float shafts = lightShafts(s.xy, noise);
+            float shafts = lightShafts(s.xy, whiteNoise(gl_FragCoord.xy));
             vec2 centred = s.xy - 0.5;
             float onScreen = 1.0 - smoothstep(0.55, 0.9, length(centred));
-            colour += sunCol * shafts * 0.22 * Misc.w * daylight * (1.0 - rain) * onScreen;
+            // Rays read as light in the air between things, so they are
+            // weaker where the pixel is open sky to begin with.
+            float inAir = isSky(depth) ? 0.45 : 1.0;
+            colour += sunCol * shafts * 0.16 * Misc.w * daylight * (1.0 - rain) * onScreen * inAir;
         }
     }
 

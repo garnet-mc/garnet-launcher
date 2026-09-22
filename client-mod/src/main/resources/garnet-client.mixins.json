@@ -3,6 +3,8 @@
   "package": "org.garnetmc.client.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
+    "AltModelBlockRendererMixin",
+    "GameRendererAccessor",
     "LevelRendererAccessor",
     "LogoRendererMixin",
     "MinecraftTitleMixin",
