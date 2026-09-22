@@ -123,7 +123,10 @@ void main() {
     float noise = interleavedNoise(gl_FragCoord.xy);
     vec3 sunCol = sunColour();
 
-    if (!isSky(depth) && !underwater) {
+    // The held item sits right in front of the camera; leave it alone.
+    bool heldItem = !isSky(depth) && length(viewPosition(texCoord, depth)) < 1.0;
+
+    if (!isSky(depth) && !underwater && !heldItem) {
         vec3 light = texture(LightSampler, texCoord).rgb;
         float ao = light.r;
         float sun = light.g;

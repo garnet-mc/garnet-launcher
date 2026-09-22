@@ -27,6 +27,12 @@ vec3 aces(vec3 x) {
 
 void main() {
     vec3 colour = texture(SceneSampler, texCoord).rgb;
+    float depth = texture(DepthSampler, texCoord).r;
+    if (!isSky(depth) && length(viewPosition(texCoord, depth)) < 1.0) {
+        // Held item: no grading, it already has the right colours.
+        fragColor = vec4(colour, 1.0);
+        return;
+    }
 
     // Unsharp mask: bring back the crispness the blurs and haze soften.
     vec2 texel = 1.0 / SceneSize;
