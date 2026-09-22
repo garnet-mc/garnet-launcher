@@ -1,0 +1,7 @@
+/target
+**/target
+*.part
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

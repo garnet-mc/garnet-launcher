@@ -1,0 +1,23 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/garnet-launcher-core",
+    "crates/garnet-launcher-cli",
+    "crates/garnet-launcher-gui",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/garnet-mc/garnet-launcher"
+
+[profile.release]
+lto = "thin"
+codegen-units = 4
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3

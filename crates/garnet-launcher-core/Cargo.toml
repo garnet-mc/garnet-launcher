@@ -1,0 +1,24 @@
+[package]
+name = "garnet-launcher-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Everything the Garnet launcher does, without a user interface"
+
+[dependencies]
+anyhow = "1.0.104"
+chrono = { version = "0.4.45", features = ["serde"] }
+dirs = "7.0.0"
+futures = "0.3.34"
+hex = "0.4.3"
+reqwest = { version = "0.13.5", features = ["form", "json", "query", "stream"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+sha1 = "0.11.0"
+sha2 = "0.11.0"
+thiserror = "2.0.20"
+tokio = { version = "1.53.1", features = ["full"] }
+toml = "1.1.6"
+tracing = "0.1.44"
+uuid = { version = "1.26.1", features = ["v4", "serde"] }
+zip = "8.6.0"
