@@ -71,6 +71,16 @@ public final class TerrainMap {
         return ready;
     }
 
+    /** Binds the map to a pass that declares a `TerrainMap` sampler. */
+    public static void bind(com.mojang.renderpearl.api.commands.RenderPass pass) {
+        if (texture == null || !ready) return;
+        com.mojang.renderpearl.api.textures.GpuTextureView view = texture.getTextureView();
+        if (view == null) return;
+        com.mojang.renderpearl.api.textures.GpuSampler sampler = com.mojang.blaze3d.systems.RenderSystem.getSamplerCache()
+                .getClampToEdge(com.mojang.renderpearl.api.textures.FilterMode.NEAREST);
+        pass.setUniform("TerrainMapSampler", view, sampler);
+    }
+
     /** Client tick: kick off a rebuild now and then. */
     public static void tick(Minecraft mc) {
         if (mc.level == null || mc.player == null) {

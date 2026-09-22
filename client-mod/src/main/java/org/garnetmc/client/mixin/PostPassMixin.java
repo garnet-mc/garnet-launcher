@@ -25,6 +25,10 @@ abstract class PostPassMixin {
     private void garnet$bindFrame(CallbackInfo ci, @Local RenderPass pass) {
         if (GarnetRender.NAMESPACE.equals(pipeline.getLocation().getNamespace())) {
             GarnetRender.bindFrame(pass);
+            String path = pipeline.getLocation().getPath();
+            if (path.contains("lighting") || path.contains("composite")) {
+                GarnetRender.bindTerrainMap(pass);
+            }
         }
     }
 }

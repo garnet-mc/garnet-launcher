@@ -116,6 +116,11 @@ public final class GarnetRender {
         }
     }
 
+    /** Binds the terrain map to passes that use it. */
+    public static void bindTerrainMap(RenderPass pass) {
+        TerrainMap.bind(pass);
+    }
+
     private static void write(Std140Builder b, Minecraft mc, LevelRenderState state, CameraRenderState cam) {
         SkyRenderState sky = state.skyRenderState;
         float partial = state.worldPartialTicks;

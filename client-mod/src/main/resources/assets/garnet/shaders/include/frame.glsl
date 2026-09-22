@@ -54,8 +54,16 @@ vec3 project(vec3 viewPos) {
     return vec3(ndc.xy * 0.5 + 0.5, depth);
 }
 
+// The depth-buffer value of the far plane, i.e. what is left where nothing
+// was drawn. Vanilla uses a reversed, infinite projection (1 at the camera,
+// 0 at infinity), but this is derived from the matrix so either way works.
+float farDepth() {
+    float ndc = ProjMat[2][2] / ProjMat[2][3];
+    return Misc.z > 0.5 ? ndc : ndc * 0.5 + 0.5;
+}
+
 bool isSky(float depth) {
-    return depth >= 0.999999;
+    return abs(depth - farDepth()) < 1e-6;
 }
 
 // A fixed per-pixel dither pattern. It must not change between frames or
