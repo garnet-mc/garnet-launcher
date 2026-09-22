@@ -6,15 +6,17 @@ import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import org.garnetmc.client.render.GarnetRender;
 import org.garnetmc.client.voice.VoiceClient;
 
-/** V to talk (hold), B to toggle voice on/off, N to whisper (hold). */
+/** V to talk (hold), B to toggle voice on/off, N to whisper (hold), K to toggle Garnet Render. */
 public final class Keybinds {
     private static final KeyMapping.Category CATEGORY = KeyMapping.Category.register(Identifier.fromNamespaceAndPath("garnet", "voice"));
 
     public static KeyMapping pushToTalk;
     public static KeyMapping toggleMute;
     public static KeyMapping whisper;
+    public static KeyMapping toggleRender;
 
     private Keybinds() {}
 
@@ -22,6 +24,7 @@ public final class Keybinds {
         pushToTalk = KeyMappingHelper.registerKeyMapping(new KeyMapping("key.garnet.talk", InputConstants.Type.KEYBOARD, InputConstants.KEY_V, CATEGORY));
         toggleMute = KeyMappingHelper.registerKeyMapping(new KeyMapping("key.garnet.mute", InputConstants.Type.KEYBOARD, InputConstants.KEY_B, CATEGORY));
         whisper = KeyMappingHelper.registerKeyMapping(new KeyMapping("key.garnet.whisper", InputConstants.Type.KEYBOARD, InputConstants.KEY_N, CATEGORY));
+        toggleRender = KeyMappingHelper.registerKeyMapping(new KeyMapping("key.garnet.render", InputConstants.Type.KEYBOARD, InputConstants.KEY_K, CATEGORY));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             VoiceClient voice = GarnetClient.voice();
@@ -35,6 +38,12 @@ public final class Keybinds {
             }
             if (voice != null) {
                 voice.setTransmitting(pushToTalk.isDown() || whisper.isDown(), whisper.isDown());
+            }
+            while (toggleRender.consumeClick()) {
+                GarnetRender.toggle();
+                if (client.player != null) {
+                    client.player.sendOverlayMessage(Component.literal(GarnetRender.isEnabled() ? "Garnet Render on" : "Garnet Render off"));
+                }
             }
         });
     }

@@ -21,6 +21,17 @@ dependencies {
     include "de.maxhenkel.opus4j:opus4j:${project.opus4j_version}"
 }
 
+loom {
+    runs {
+        client {
+            // `./gradlew runClient -Pserver=host:port` joins a server straight away.
+            if (project.hasProperty('server')) {
+                programArgs '--quickPlayMultiplayer', project.property('server')
+            }
+        }
+    }
+}
+
 tasks.withType(JavaCompile).configureEach {
     it.options.release = 25
 }

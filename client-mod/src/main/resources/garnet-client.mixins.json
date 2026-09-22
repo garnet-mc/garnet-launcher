@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "package": "org.garnetmc.client.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "LevelRendererAccessor",
+    "MinecraftTitleMixin",
+    "PostChainMixin",
+    "PostPassMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "minVersion": "0.8"
+}

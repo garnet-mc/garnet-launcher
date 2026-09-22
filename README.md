@@ -16,7 +16,8 @@ Windows, macOS (Intel and Apple Silicon) and Linux.
 
 - **Join a server, get its mods** – Garnet servers advertise the client mods they need. Type the address, the launcher creates an instance with the right Minecraft version and Fabric, installs the mods (verified by hash) and launches straight into the server.
 - **Instances** – separate folders for mods, saves and options; shared downloads.
-- **Garnet Loader** – Fabric plus Garnet's client mod (voice chat, server mod sync, shader helper), so every Fabric mod keeps working. The mod lives in [`client-mod/`](client-mod/).
+- **Garnet Loader** – Fabric plus Garnet's client mod, so every Fabric mod keeps working. The mod lives in [`client-mod/`](client-mod/).
+- **Garnet Render** – our own shader pipeline built into the client mod: ambient occlusion, sun shadows, atmosphere, light shafts, bloom and filmic tone mapping on Minecraft 26's GPU abstraction, so it runs on OpenGL and Vulkan alike. No Iris required; the Iris-format pack in [`shaders/`](shaders/) is kept for people who already use Iris.
 - **Modrinth built in** – search and install mods, shader packs and resource packs with dependencies.
 - **Automatic Java** – the exact runtime Mojang ships for the version, kept apart from anything on your system.
 - **A CLI** – everything is scriptable with `garnet-launcher`.

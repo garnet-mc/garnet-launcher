@@ -15,6 +15,7 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
+import org.garnetmc.client.render.GarnetRender;
 import org.garnetmc.client.voice.VoiceClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -88,6 +89,7 @@ public final class GarnetClient implements ClientModInitializer {
             if (voice != null) voice.tick();
         });
 
+        GarnetRender.init();
         Keybinds.register();
         VoiceHud.register();
         LOG.info("Garnet client ready");

@@ -37,11 +37,14 @@ varying vec2 texcoord;
 
 /* DRAWBUFFERS:3 */
 
+// Buffer formats are read by Iris from comments; they are not GLSL.
+/*
 const int colortex1Format = RGBA16;
 const int colortex2Format = RGBA16;
 const int colortex3Format = RGBA16F;
 const int colortex4Format = RGBA16F;
 const bool colortex3Clear = false;
+*/
 const float sunPathRotation = -35.0;
 const float ambientOcclusionLevel = 0.6;
 

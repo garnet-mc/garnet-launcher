@@ -3,6 +3,14 @@
 The Fabric mod half of Garnet. It is small on purpose: everything a Garnet
 server needs from the client that vanilla cannot do.
 
+- **Garnet Render** – our own shader pipeline, no Iris needed. It hooks the
+  end-of-frame post effect that Minecraft 26 runs through its GPU
+  abstraction, so it works on both the OpenGL and Vulkan backends and next
+  to any other mod. Passes: ambient occlusion, screen-space sun shadows,
+  atmosphere and light shafts, bloom, filmic tone mapping. `K` toggles it;
+  strengths live in `config/garnet-render.properties`. The shaders are plain
+  `#version 330` files under `assets/garnet/shaders/post/` and the chain is
+  `assets/garnet/post_effect/render.json`.
 - **Server mod sync** – answers the server's `garnet:mods` handshake with the
   list of installed mods, so the server can let you in or tell the launcher
   what to install.
@@ -14,7 +22,15 @@ server needs from the client that vanilla cannot do.
 - **HUD** – a small indicator bottom-left showing voice state and who is
   talking.
 
-Default keys: `V` push to talk, `N` whisper (short range), `B` mute.
+Default keys: `V` push to talk, `N` whisper (short range), `B` mute, `K` Garnet Render on/off.
+
+## Testing against a local server
+
+```
+./gradlew runClient -Pserver=127.0.0.1:25565
+```
+
+launches the development client and joins that address straight away.
 
 ## Building
 
