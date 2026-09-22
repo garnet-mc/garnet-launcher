@@ -64,6 +64,12 @@ float interleavedNoise(vec2 pixel) {
     return fract(52.9829189 * fract(0.06711056 * pixel.x + 0.00583715 * pixel.y));
 }
 
+// Shadows only carry weight when the sun is well above the horizon; a low
+// sun would drape the whole world in shadow.
+float shadowWeight() {
+    return smoothstep(0.06, 0.40, SunDirWorld.w);
+}
+
 vec3 sunColour() {
     float h = clamp(SunDirWorld.w, -0.2, 1.0);
     vec3 noon = vec3(1.0, 0.96, 0.9);

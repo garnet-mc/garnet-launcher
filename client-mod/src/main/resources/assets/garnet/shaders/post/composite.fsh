@@ -139,8 +139,8 @@ void main() {
         }
 
         // Shadowed areas keep the sky's ambient light; lit areas get the sun.
-        float shade = mix(1.0, sun, Strength.y * daylight * (1.0 - rain * 0.8));
-        vec3 shadowTint = mix(vec3(0.62, 0.68, 0.80), vec3(1.0), shade);
+        float shade = mix(1.0, sun, Strength.y * shadowWeight() * (1.0 - rain * 0.8));
+        vec3 shadowTint = mix(vec3(0.70, 0.74, 0.84), vec3(1.0), shade);
         colour *= shadowTint;
         // Lit surfaces get a touch of the sun's colour; kept subtle so the
         // vanilla palette stays recognisable.

@@ -106,7 +106,7 @@ float terrainShadow(vec3 worldRel, vec3 nWorld, float noise) {
     float t = 0.9;
     for (int i = 0; i < TERRAIN_STEPS; i++) {
         vec3 q = pos + sun * t;
-        if (!insideMap(q.xz) || q.y > 330.0) break;
+        if (!insideMap(q.xz) || q.y > 330.0 || t > 48.0) break;
         float gap = q.y - mapSurface(TerrainMapSampler, q.xz);
         if (gap < -0.05) return 0.0;
         // A narrow penumbra: only rays that just skim a ridge get darker.
