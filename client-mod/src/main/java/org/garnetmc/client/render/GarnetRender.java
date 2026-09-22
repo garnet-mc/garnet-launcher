@@ -231,12 +231,15 @@ public final class GarnetRender {
         boolean hasClouds = state.skyRenderState.skybox == DimensionType.Skybox.OVERWORLD
                 && mc.options.getCloudStatus() != CloudStatus.OFF
                 && state.cloudHeight > 0f;
+        // The height doubles as "there are clouds up there": water mirrors
+        // them even when their shadows are turned off.
+        float height = hasClouds ? state.cloudHeight : 0f;
         float strength = hasClouds ? settings.cloudShadows * 0.32f : 0f;
         float drift = ((float) (state.gameTime % 400L) + partial) * 0.03f;
         // Kept near the origin so the shader's maths stays precise far out.
         float shiftX = (TerrainMap.originX() + drift) % CLOUD_PERIOD;
         float shiftZ = (TerrainMap.originZ() + 3.96f) % CLOUD_PERIOD;
-        b.putVec4(shiftX, shiftZ, state.cloudHeight, strength);
+        b.putVec4(shiftX, shiftZ, height, strength);
     }
 
     private static float smoothstep(float edge0, float edge1, float x) {

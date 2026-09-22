@@ -40,6 +40,19 @@ float mapWaterDepth(sampler2D map, vec2 xz) {
     return texture(map, mapCoord(xz)).b * 255.0;
 }
 
+// Water depth again, read across the four columns around the point so the
+// sea shelves smoothly instead of in block-sized steps.
+float mapWaterDepthSmooth(sampler2D map, vec2 xz) {
+    vec2 p = xz - 0.5;
+    vec2 corner = floor(p);
+    vec2 f = p - corner;
+    float d00 = texture(map, mapCoord(corner + vec2(0.5, 0.5))).b;
+    float d10 = texture(map, mapCoord(corner + vec2(1.5, 0.5))).b;
+    float d01 = texture(map, mapCoord(corner + vec2(0.5, 1.5))).b;
+    float d11 = texture(map, mapCoord(corner + vec2(1.5, 1.5))).b;
+    return mix(mix(d00, d10, f.x), mix(d01, d11, f.x), f.y) * 255.0;
+}
+
 bool insideMap(vec2 xz) {
     return xz.x > 1.0 && xz.y > 1.0 && xz.x < MapParams.x - 1.0 && xz.y < MapParams.x - 1.0;
 }
@@ -96,7 +109,7 @@ float shadowWeight() {
 // read where it gets there, so the shadow lands under the cloud that casts
 // it. 0 when the sky is clear here, the setting's strength when it is not.
 float cloudShadow(sampler2D clouds, vec3 worldRel) {
-    if (CloudInfo.w <= 0.0 || SunDirWorld.y <= 0.05) return 0.0;
+    if (CloudInfo.w <= 0.0 || CloudInfo.z <= 0.0 || SunDirWorld.y <= 0.05) return 0.0;
     float travel = (CloudInfo.z - worldRel.y) / SunDirWorld.y;
     if (travel <= 0.0) return 0.0; // above the clouds: nothing left to shade
     vec2 at = worldRel.xz + SunDirWorld.xz * travel + CloudInfo.xy;
@@ -104,6 +117,24 @@ float cloudShadow(sampler2D clouds, vec3 worldRel) {
     // because the sampler holds its edge instead of tiling.
     vec2 uv = fract(at / (12.0 * vec2(textureSize(clouds, 0))));
     return texture(clouds, uv).a * CloudInfo.w;
+}
+
+// Clouds are drawn into the same depth buffer as the world, so they arrive
+// here looking like geometry. They are not: nothing should shade them, and
+// they must not cast a shadow on themselves.
+bool onCloudDeck(sampler2D map, vec3 worldRel) {
+    if (CloudInfo.z <= 0.0 || abs(worldRel.y - CloudInfo.z) > 8.0) return false;
+    return worldRel.y > mapSurface(map, worldRel.xz) + 6.0;
+}
+
+// The cloud cover a ray reaches when it leaves this point, for water to
+// mirror. 0 where the sky is open.
+float cloudCover(sampler2D clouds, vec3 worldRel, vec3 dir) {
+    if (CloudInfo.z <= 0.0 || dir.y <= 0.02) return 0.0;
+    float travel = (CloudInfo.z - worldRel.y) / dir.y;
+    if (travel <= 0.0) return 0.0;
+    vec2 at = worldRel.xz + dir.xz * travel + CloudInfo.xy;
+    return texture(clouds, fract(at / (12.0 * vec2(textureSize(clouds, 0))))).a;
 }
 
 vec3 sunColour() {

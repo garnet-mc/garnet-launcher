@@ -135,6 +135,10 @@ void main() {
     vec3 n = normalFromDepth(texCoord, p);
     float noise = interleavedNoise(gl_FragCoord.xy);
     vec3 worldRel = worldRelative(p);
+    if (onCloudDeck(TerrainMapSampler, worldRel)) {
+        fragColor = vec4(1.0, 1.0, 0.0, 1.0); // a cloud: lit, unshadowed, dry
+        return;
+    }
     vec3 nWorld = normalize((ViewInv * vec4(n, 0.0)).xyz);
     float dist = length(p);
 

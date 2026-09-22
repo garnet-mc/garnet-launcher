@@ -3,14 +3,8 @@
     "light": {},
     "light_blur": {},
     "scene": {},
-    "bloom": {
-      "width": 640,
-      "height": 360
-    },
-    "bloom_blur": {
-      "width": 640,
-      "height": 360
-    }
+    "bloom": {},
+    "bloom_blur": {}
   },
   "passes": [
     {
