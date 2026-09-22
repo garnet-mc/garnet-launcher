@@ -1,5 +1,8 @@
 # Garnet Shaders
 
+> **Status:** compiles under Iris 1.11 on Minecraft 26.3, but the look is not tuned yet (sky and tint are off). Garnet's primary pipeline is **Garnet Render** inside the client mod, which needs no Iris; this pack is kept for Iris users and will be tuned later.
+
+
 A shader pack for [Iris](https://irisshaders.dev) (and OptiFine-format loaders), made for Garnet but usable anywhere.
 
 - Soft, dithered shadows with a distorted shadow map for detail near the player
