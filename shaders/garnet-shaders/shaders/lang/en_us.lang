@@ -1,0 +1,15 @@
+option.SHADOWS_ENABLED=Shadows
+option.SHADOW_SOFTNESS=Shadow softness
+option.AO_ENABLED=Ambient occlusion
+option.AO_STRENGTH=AO strength
+option.VOLUMETRIC_LIGHT=Volumetric light
+option.VL_STRENGTH=Light shaft strength
+option.WATER_REFLECTIONS=Water reflections
+option.WATER_WAVES=Wave height
+option.BLOOM_ENABLED=Bloom
+option.BLOOM_STRENGTH=Bloom strength
+option.RTGI_ENABLED=Ray-traced GI (experimental)
+option.RTGI_ENABLED.comment=Screen-space ray traced global illumination. Bounced light from nearby surfaces. Costs a lot of frames.
+option.RTGI_SAMPLES=GI rays per pixel
+option.WAVING_PLANTS=Waving plants
+option.EXPOSURE=Exposure
